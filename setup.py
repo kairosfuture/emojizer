@@ -6,5 +6,7 @@ setup(
     packages=['torchmoji'],
     description='torchMoji',
     include_package_data=True,
-    install_requires=[],
+    install_requires=[
+        "torch>=1.11.0"
+    ],
 )

@@ -13,6 +13,7 @@ from torch.nn.parameter import Parameter
 from torch.nn.utils.rnn import PackedSequence
 import torch.nn.functional as F
 
+
 class LSTMHardSigmoid(Module):
 
     def __init__(self, input_size, hidden_size,
@@ -75,11 +76,12 @@ class LSTMHardSigmoid(Module):
     def forward(self, input, hx=None):
         is_packed = isinstance(input, PackedSequence)
         if is_packed:
-            input, batch_sizes = input
+            input, batch_sizes = input.data, input.batch_sizes
             max_batch_size = batch_sizes[0]
         else:
             batch_sizes = None
-            max_batch_size = input.size(0) if self.batch_first else input.size(1)
+            max_batch_size = input.size(
+                0) if self.batch_first else input.size(1)
 
         if hx is None:
             num_directions = 2 if self.bidirectional else 1
@@ -89,11 +91,13 @@ class LSTMHardSigmoid(Module):
                                                         self.hidden_size).zero_(), requires_grad=False)
             hx = (hx, hx)
 
-        has_flat_weights = list(p.data.data_ptr() for p in self.parameters()) == self._data_ptrs
+        has_flat_weights = list(p.data.data_ptr()
+                                for p in self.parameters()) == self._data_ptrs
         if has_flat_weights:
             first_data = next(self.parameters()).data
             assert first_data.storage().size() == self._param_buf_size
-            flat_weight = first_data.new().set_(first_data.storage(), 0, torch.Size([self._param_buf_size]))
+            flat_weight = first_data.new().set_(first_data.storage(), 0,
+                                                torch.Size([self._param_buf_size]))
         else:
             flat_weight = None
         func = AutogradRNN(
@@ -141,7 +145,8 @@ class LSTMHardSigmoid(Module):
         for layer in range(num_layers):
             for direction in range(num_directions):
                 suffix = '_reverse' if direction == 1 else ''
-                weights = ['weight_ih_l{}{}', 'weight_hh_l{}{}', 'bias_ih_l{}{}', 'bias_hh_l{}{}']
+                weights = ['weight_ih_l{}{}', 'weight_hh_l{}{}',
+                           'bias_ih_l{}{}', 'bias_hh_l{}{}']
                 weights = [x.format(layer, suffix) for x in weights]
                 if self.bias:
                     self._all_weights += [weights]
@@ -151,6 +156,7 @@ class LSTMHardSigmoid(Module):
     @property
     def all_weights(self):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
+
 
 def AutogradRNN(input_size, hidden_size, num_layers=1, batch_first=False,
                 dropout=0, train=True, bidirectional=False, batch_sizes=None,
@@ -187,10 +193,12 @@ def AutogradRNN(input_size, hidden_size, num_layers=1, batch_first=False,
 
     return forward
 
+
 def Recurrent(inner, reverse=False):
     def forward(input, hidden, weight):
         output = []
-        steps = range(input.size(0) - 1, -1, -1) if reverse else range(input.size(0))
+        steps = range(input.size(0) - 1, -1, -
+                      1) if reverse else range(input.size(0))
         for i in steps:
             hidden = inner(input[i], hidden, *weight)
             # hack to handle LSTM
@@ -212,6 +220,7 @@ def variable_recurrent_factory(batch_sizes):
         else:
             return VariableRecurrent(batch_sizes, inner)
     return fac
+
 
 def VariableRecurrent(batch_sizes, inner):
     def forward(input, hidden, weight):
@@ -286,6 +295,7 @@ def VariableRecurrentReverse(batch_sizes, inner):
 
     return forward
 
+
 def StackedRNN(inners, num_layers, lstm=False, dropout=0, train=True):
 
     num_directions = len(inners)
@@ -310,7 +320,8 @@ def StackedRNN(inners, num_layers, lstm=False, dropout=0, train=True):
             input = torch.cat(all_output, input.dim() - 1)
 
             if dropout != 0 and i < num_layers - 1:
-                input = F.dropout(input, p=dropout, training=train, inplace=False)
+                input = F.dropout(input, p=dropout,
+                                  training=train, inplace=False)
 
         if lstm:
             next_h, next_c = zip(*next_hidden)
@@ -325,6 +336,7 @@ def StackedRNN(inners, num_layers, lstm=False, dropout=0, train=True):
         return next_hidden, input
 
     return forward
+
 
 def LSTMCell(input, hidden, w_ih, w_hh, b_ih=None, b_hh=None):
     """
@@ -344,6 +356,7 @@ def LSTMCell(input, hidden, w_ih, w_hh, b_ih=None, b_hh=None):
     hy = outgate * F.tanh(cy)
 
     return hy, cy
+
 
 def hard_sigmoid(x):
     """
