@@ -2,18 +2,18 @@
 """ Model definition functions and weight loading.
 """
 
-from __future__ import print_function, division, unicode_literals
+from __future__ import division, print_function, unicode_literals
 
 from os.path import exists
 
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, PackedSequence
+from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence, pad_packed_sequence
 
-from torchmoji.lstm import LSTMHardSigmoid
 from torchmoji.attlayer import Attention
-from torchmoji.global_variables import NB_TOKENS, NB_EMOJI_CLASSES
+from torchmoji.global_variables import NB_EMOJI_CLASSES, NB_TOKENS
+from torchmoji.lstm import LSTMHardSigmoid
 
 
 def torchmoji_feature_encoding(weight_path, return_attention=False):
@@ -31,9 +31,9 @@ def torchmoji_feature_encoding(weight_path, return_attention=False):
     """
 
     model = TorchMoji(nb_classes=None,
-                     nb_tokens=NB_TOKENS,
-                     feature_output=True,
-                     return_attention=return_attention)
+                      nb_tokens=NB_TOKENS,
+                      feature_output=True,
+                      return_attention=return_attention)
     load_specific_weights(model, weight_path, exclude_names=['output_layer'])
     return model
 
@@ -53,14 +53,14 @@ def torchmoji_emojis(weight_path, return_attention=False):
     """
 
     model = TorchMoji(nb_classes=NB_EMOJI_CLASSES,
-                     nb_tokens=NB_TOKENS,
-                     return_attention=return_attention)
+                      nb_tokens=NB_TOKENS,
+                      return_attention=return_attention)
     model.load_state_dict(torch.load(weight_path))
     return model
 
 
 def torchmoji_transfer(nb_classes, weight_path=None, extend_embedding=0,
-                      embed_dropout_rate=0.1, final_dropout_rate=0.5):
+                       embed_dropout_rate=0.1, final_dropout_rate=0.5):
     """ Loads the pretrained torchMoji model for finetuning/transfer learning.
         Does not load weights for the softmax layer.
 
@@ -86,10 +86,10 @@ def torchmoji_transfer(nb_classes, weight_path=None, extend_embedding=0,
     """
 
     model = TorchMoji(nb_classes=nb_classes,
-                     nb_tokens=NB_TOKENS + extend_embedding,
-                     embed_dropout_rate=embed_dropout_rate,
-                     final_dropout_rate=final_dropout_rate,
-                     output_logits=True)
+                      nb_tokens=NB_TOKENS + extend_embedding,
+                      embed_dropout_rate=embed_dropout_rate,
+                      final_dropout_rate=final_dropout_rate,
+                      output_logits=True)
     if weight_path is not None:
         load_specific_weights(model, weight_path,
                               exclude_names=['output_layer'],
@@ -135,13 +135,17 @@ class TorchMoji(nn.Module):
         # dropout2D: embedding channels are dropped out instead of words
         # many exampels in the datasets contain few words that losing one or more words can alter the emotions completely
         self.add_module('embed_dropout', nn.Dropout2d(embed_dropout_rate))
-        self.add_module('lstm_0', LSTMHardSigmoid(embedding_dim, hidden_size, batch_first=True, bidirectional=True))
-        self.add_module('lstm_1', LSTMHardSigmoid(hidden_size*2, hidden_size, batch_first=True, bidirectional=True))
-        self.add_module('attention_layer', Attention(attention_size=attention_size, return_attention=return_attention))
+        self.add_module('lstm_0', LSTMHardSigmoid(
+            embedding_dim, hidden_size, batch_first=True, bidirectional=True))
+        self.add_module('lstm_1', LSTMHardSigmoid(
+            hidden_size*2, hidden_size, batch_first=True, bidirectional=True))
+        self.add_module('attention_layer', Attention(
+            attention_size=attention_size, return_attention=return_attention))
         if not feature_output:
             self.add_module('final_dropout', nn.Dropout(final_dropout_rate))
             if output_logits:
-                self.add_module('output_layer', nn.Sequential(nn.Linear(attention_size, nb_classes if self.nb_classes > 2 else 1)))
+                self.add_module('output_layer', nn.Sequential(
+                    nn.Linear(attention_size, nb_classes if self.nb_classes > 2 else 1)))
             else:
                 self.add_module('output_layer', nn.Sequential(nn.Linear(attention_size, nb_classes if self.nb_classes > 2 else 1),
                                                               nn.Softmax() if self.nb_classes > 2 else nn.Sigmoid()))
@@ -153,8 +157,10 @@ class TorchMoji(nn.Module):
         """
         Here we reproduce Keras default initialization weights for consistency with Keras version
         """
-        ih = (param.data for name, param in self.named_parameters() if 'weight_ih' in name)
-        hh = (param.data for name, param in self.named_parameters() if 'weight_hh' in name)
+        ih = (param.data for name, param in self.named_parameters()
+              if 'weight_ih' in name)
+        hh = (param.data for name, param in self.named_parameters()
+              if 'weight_hh' in name)
         b = (param.data for name, param in self.named_parameters() if 'bias' in name)
         nn.init.uniform(self.embed.weight.data, a=-0.5, b=0.5)
         for t in ih:
@@ -182,30 +188,38 @@ class TorchMoji(nn.Module):
             input_seqs = Variable(input_seqs)
             return_tensor = True
         elif not isinstance(input_seqs, Variable):
-            input_seqs = Variable(torch.from_numpy(input_seqs.astype('int64')).long())
+            input_seqs = Variable(torch.from_numpy(
+                input_seqs.astype('int64')).long())
             return_numpy = True
 
         # If we don't have a packed inputs, let's pack it
         reorder_output = False
         if not isinstance(input_seqs, PackedSequence):
-            ho = self.lstm_0.weight_hh_l0.data.new(2, input_seqs.size()[0], self.hidden_size).zero_()
-            co = self.lstm_0.weight_hh_l0.data.new(2, input_seqs.size()[0], self.hidden_size).zero_()
+            ho = self.lstm_0.weight_hh_l0.data.new(
+                2, input_seqs.size()[0], self.hidden_size).zero_()
+            co = self.lstm_0.weight_hh_l0.data.new(
+                2, input_seqs.size()[0], self.hidden_size).zero_()
 
             # Reorder batch by sequence length
-            input_lengths = torch.LongTensor([torch.max(input_seqs[i, :].data.nonzero()) + 1 for i in range(input_seqs.size()[0])])
+            input_lengths = torch.LongTensor([torch.max(
+                input_seqs[i, :].data.nonzero()) + 1 for i in range(input_seqs.size()[0])])
             input_lengths, perm_idx = input_lengths.sort(0, descending=True)
             input_seqs = input_seqs[perm_idx][:, :input_lengths.max()]
 
             # Pack sequence and work on data tensor to reduce embeddings/dropout computations
-            packed_input = pack_padded_sequence(input_seqs, input_lengths.cpu().numpy(), batch_first=True)
+            packed_input = pack_padded_sequence(
+                input_seqs, input_lengths.cpu().numpy(), batch_first=True)
             reorder_output = True
         else:
-            ho = self.lstm_0.weight_hh_l0.data.data.new(2, input_seqs.size()[0], self.hidden_size).zero_()
-            co = self.lstm_0.weight_hh_l0.data.data.new(2, input_seqs.size()[0], self.hidden_size).zero_()
+            ho = self.lstm_0.weight_hh_l0.data.data.new(
+                2, input_seqs.size()[0], self.hidden_size).zero_()
+            co = self.lstm_0.weight_hh_l0.data.data.new(
+                2, input_seqs.size()[0], self.hidden_size).zero_()
             input_lengths = input_seqs.batch_sizes
             packed_input = input_seqs
 
-        hidden = (Variable(ho, requires_grad=False), Variable(co, requires_grad=False))
+        hidden = (Variable(ho, requires_grad=False),
+                  Variable(co, requires_grad=False))
 
         # Embed with an activation function to bound the values of the embeddings
         x = self.embed(packed_input.data)
@@ -305,11 +319,11 @@ def load_specific_weights(model, weight_path, exclude_names=[], extend_embedding
             if verbose:
                 print('Extended vocabulary for embedding layer ' +
                       'from {} to {} tokens.'.format(
-                        NB_TOKENS, NB_TOKENS + extend_embedding))
+                          NB_TOKENS, NB_TOKENS + extend_embedding))
         try:
             model_w.copy_(weight)
         except:
             print('While copying the weigths named {}, whose dimensions in the model are'
                   ' {} and whose dimensions in the saved file are {}, ...'.format(
-                        key, model_w.size(), weight.size()))
+                      key, model_w.size(), weight.size()))
             raise

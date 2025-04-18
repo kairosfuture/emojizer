@@ -6,21 +6,21 @@ from __future__ import print_function
 
 import uuid
 from time import sleep
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from torchmoji.global_variables import (
-    FINETUNING_METHODS,
-    WEIGHTS_DIR)
 from torchmoji.finetuning import (
+    find_f1_threshold,
+    fit_model,
     freeze_layers,
     get_data_loader,
-    fit_model,
     train_by_chain_thaw,
-    find_f1_threshold)
+)
+from torchmoji.global_variables import FINETUNING_METHODS, WEIGHTS_DIR
+
 
 def relabel(y, current_label_nr, nb_classes):
     """ Makes a binary classification for a specific class in a
@@ -101,16 +101,19 @@ def class_avg_finetune(model, texts, labels, nb_classes, batch_size,
 
     # Define optimizer, for chain-thaw we define it later (after freezing)
     if method == 'last':
-        adam = optim.Adam((p for p in model.parameters() if p.requires_grad), lr=lr)
+        adam = optim.Adam((p for p in model.parameters()
+                          if p.requires_grad), lr=lr)
     elif method in ['full', 'new']:
         # Add L2 regulation on embeddings only
         special_params = [id(p) for p in model.embed.parameters()]
-        base_params = [p for p in model.parameters() if id(p) not in special_params and p.requires_grad]
-        embed_parameters = [p for p in model.parameters() if id(p) in special_params and p.requires_grad]
+        base_params = [p for p in model.parameters() if id(
+            p) not in special_params and p.requires_grad]
+        embed_parameters = [p for p in model.parameters() if id(
+            p) in special_params and p.requires_grad]
         adam = optim.Adam([
             {'params': base_params},
             {'params': embed_parameters, 'weight_decay': embed_l2},
-            ], lr=lr)
+        ], lr=lr)
 
     # Training
     if verbose:
@@ -151,6 +154,7 @@ def prepare_labels(y_train, y_val, y_test, iter_i, nb_classes):
     y_val_new = relabel(y_val, iter_i, nb_classes)
     y_test_new = relabel(y_test, iter_i, nb_classes)
     return y_train_new, y_val_new, y_test_new
+
 
 def prepare_generators(X_train, y_train_new, X_val, y_val_new, batch_size, epoch_size):
     # Create sample generators
@@ -285,8 +289,8 @@ def class_avg_chainthaw(model, nb_classes, loss_op, train, val, test, batch_size
         y_train_new, y_val_new, y_test_new = prepare_labels(y_train, y_val,
                                                             y_test, i, nb_classes)
         train_gen, X_val_resamp, y_val_resamp = \
-                prepare_generators(X_train, y_train_new, X_val, y_val_new,
-                                   batch_size, epoch_size)
+            prepare_generators(X_train, y_train_new, X_val, y_val_new,
+                               batch_size, epoch_size)
 
         if verbose:
             print("Training..")

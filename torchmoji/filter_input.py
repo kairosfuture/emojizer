@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function, division
+from __future__ import division, print_function
+
 import codecs
 import csv
+
 import numpy as np
 from emoji import UNICODE_EMOJI
+
 
 def read_english(path="english_words.txt", add_emojis=True):
     # read english words for filtering (includes emojis as part of set)
@@ -18,6 +21,7 @@ def read_english(path="english_words.txt", add_emojis=True):
             english.add(e)
     return english
 
+
 def read_wanted_emojis(path="wanted_emojis.csv"):
     emojis = []
     with open(path, 'rb') as f:
@@ -27,6 +31,7 @@ def read_wanted_emojis(path="wanted_emojis.csv"):
             line = line.decode('unicode-escape')
             emojis.append(line)
     return emojis
+
 
 def read_non_english_users(path="unwanted_users.npz"):
     try:

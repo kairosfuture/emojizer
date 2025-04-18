@@ -3,30 +3,29 @@
 """
 from __future__ import print_function
 
-import uuid
-from time import sleep
-from io import open
-
 import math
 import pickle
-import numpy as np
+import uuid
+from io import open
+from time import sleep
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from torch.autograd import Variable
-from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from torch.nn.utils import clip_grad_norm
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
-from sklearn.metrics import f1_score
-
-from torchmoji.global_variables import (FINETUNING_METHODS,
-                                               FINETUNING_METRICS,
-                                               WEIGHTS_DIR)
-from torchmoji.tokenizer import tokenize
+from torchmoji.global_variables import (
+    FINETUNING_METHODS,
+    FINETUNING_METRICS,
+    WEIGHTS_DIR,
+)
 from torchmoji.sentence_tokenizer import SentenceTokenizer
+from torchmoji.tokenizer import tokenize
 
 try:
     unicode
@@ -119,7 +118,6 @@ def calculate_batchsize_maxlen(texts):
     return batch_size, maxlen
 
 
-
 def freeze_layers(model, unfrozen_types=[], unfrozen_keyword=None):
     """ Freezes all layers in the given model, except for ones that are
         explicitly specified to not be frozen.
@@ -133,7 +131,8 @@ def freeze_layers(model, unfrozen_types=[], unfrozen_keyword=None):
         Model with the selected layers frozen.
     """
     # Get trainable modules
-    trainable_modules = [(n, m) for n, m in model.named_children() if len([id(p) for p in m.parameters()]) !=  0]
+    trainable_modules = [(n, m) for n, m in model.named_children() if len(
+        [id(p) for p in m.parameters()]) != 0]
     for name, module in trainable_modules:
         trainable = (any(typ in str(module) for typ in unfrozen_types) or
                      (unfrozen_keyword is not None and unfrozen_keyword.lower() in name.lower()))
@@ -149,15 +148,18 @@ def change_trainable(module, trainable, verbose=False):
         trainable: Whether the layer should be frozen or unfrozen.
         verbose: Verbosity flag.
     """
-    
-    if verbose: print('Changing MODULE', module, 'to trainable =', trainable)
+
+    if verbose:
+        print('Changing MODULE', module, 'to trainable =', trainable)
     for name, param in module.named_parameters():
-        if verbose: print('Setting weight', name, 'to trainable =', trainable)
+        if verbose:
+            print('Setting weight', name, 'to trainable =', trainable)
         param.requires_grad = trainable
 
     if verbose:
         action = 'Unfroze' if trainable else 'Froze'
-        if verbose: print("{} {}".format(action, module))
+        if verbose:
+            print("{} {}".format(action, module))
 
 
 def find_f1_threshold(model, val_gen, test_gen, average='binary'):
@@ -234,7 +236,7 @@ def finetune(model, texts, labels, nb_classes, batch_size, method,
     val_gen = get_data_loader(texts[1], labels[1], batch_size,
                               extended_batch_sampler=False)
     test_gen = get_data_loader(texts[2], labels[2], batch_size,
-                              extended_batch_sampler=False)
+                               extended_batch_sampler=False)
 
     checkpoint_path = '{}/torchmoji-checkpoint-{}.bin' \
                       .format(WEIGHTS_DIR, str(uuid.uuid4()))
@@ -245,7 +247,7 @@ def finetune(model, texts, labels, nb_classes, batch_size, method,
         lr = 0.0001
 
     loss_op = nn.BCEWithLogitsLoss() if nb_classes <= 2 \
-         else nn.CrossEntropyLoss()
+        else nn.CrossEntropyLoss()
 
     # Freeze layers if using last
     if method == 'last':
@@ -253,20 +255,24 @@ def finetune(model, texts, labels, nb_classes, batch_size, method,
 
     # Define optimizer, for chain-thaw we define it later (after freezing)
     if method == 'last':
-        adam = optim.Adam((p for p in model.parameters() if p.requires_grad), lr=lr)
+        adam = optim.Adam((p for p in model.parameters()
+                          if p.requires_grad), lr=lr)
     elif method in ['full', 'new']:
         # Add L2 regulation on embeddings only
         embed_params_id = [id(p) for p in model.embed.parameters()]
-        output_layer_params_id = [id(p) for p in model.output_layer.parameters()]
+        output_layer_params_id = [id(p)
+                                  for p in model.output_layer.parameters()]
         base_params = [p for p in model.parameters()
                        if id(p) not in embed_params_id and id(p) not in output_layer_params_id and p.requires_grad]
-        embed_params = [p for p in model.parameters() if id(p) in embed_params_id and p.requires_grad]
-        output_layer_params = [p for p in model.parameters() if id(p) in output_layer_params_id and p.requires_grad]
+        embed_params = [p for p in model.parameters() if id(
+            p) in embed_params_id and p.requires_grad]
+        output_layer_params = [p for p in model.parameters() if id(
+            p) in output_layer_params_id and p.requires_grad]
         adam = optim.Adam([
             {'params': base_params},
             {'params': embed_params, 'weight_decay': embed_l2},
             {'params': output_layer_params, 'lr': 0.001},
-            ], lr=lr)
+        ], lr=lr)
 
     # Training
     if verbose:
@@ -307,14 +313,18 @@ def tune_trainable(model, loss_op, optim_op, train_gen, val_gen, test_gen,
         Accuracy of the trained model, ONLY if 'evaluate' is set.
     """
     if verbose:
-        print("Trainable weights: {}".format([n for n, p in model.named_parameters() if p.requires_grad]))
+        print("Trainable weights: {}".format(
+            [n for n, p in model.named_parameters() if p.requires_grad]))
         print("Training...")
         if evaluate == 'acc':
-            print("Evaluation on test set prior training:", evaluate_using_acc(model, test_gen))
+            print("Evaluation on test set prior training:",
+                  evaluate_using_acc(model, test_gen))
         elif evaluate == 'weighted_f1':
-            print("Evaluation on test set prior training:", evaluate_using_weighted_f1(model, test_gen, val_gen))
+            print("Evaluation on test set prior training:",
+                  evaluate_using_weighted_f1(model, test_gen, val_gen))
 
-    fit_model(model, loss_op, optim_op, train_gen, val_gen, nb_epochs, checkpoint_path, patience)
+    fit_model(model, loss_op, optim_op, train_gen, val_gen,
+              nb_epochs, checkpoint_path, patience)
 
     # Reload the best weights found to avoid overfitting
     # Wait a bit to allow proper closing of weights file
@@ -344,7 +354,8 @@ def evaluate_using_weighted_f1(model, test_gen, val_gen):
         Weighted F1 score of the given model.
     """
     # Evaluate on test and val data
-    f1_test, _ = find_f1_threshold(model, test_gen, val_gen, average='weighted_f1')
+    f1_test, _ = find_f1_threshold(
+        model, test_gen, val_gen, average='weighted_f1')
     return f1_test
 
 
@@ -439,7 +450,8 @@ def train_by_chain_thaw(model, train_gen, val_gen, loss_op, patience, nb_epochs,
         verbose: Verbosity flag.
     """
     # Get trainable layers
-    layers = [m for m in model.children() if len([id(p) for p in m.parameters()]) !=  0]
+    layers = [m for m in model.children() if len(
+        [id(p) for p in m.parameters()]) != 0]
 
     # Bring last layer to front
     layers.insert(0, layers.pop(len(layers) - 1))
@@ -464,7 +476,8 @@ def train_by_chain_thaw(model, train_gen, val_gen, loss_op, patience, nb_epochs,
 
         # Verify we froze the right layers
         for _layer in model.children():
-            assert all(p.requires_grad == (_layer == layer) for p in _layer.parameters()) or layer is None
+            assert all(p.requires_grad == (_layer == layer)
+                       for p in _layer.parameters()) or layer is None
 
         if verbose:
             if layer is None:
@@ -473,12 +486,14 @@ def train_by_chain_thaw(model, train_gen, val_gen, loss_op, patience, nb_epochs,
                 print('Finetuning {}'.format(layer))
 
         special_params = [id(p) for p in model.embed.parameters()]
-        base_params = [p for p in model.parameters() if id(p) not in special_params and p.requires_grad]
-        embed_parameters = [p for p in model.parameters() if id(p) in special_params and p.requires_grad]
+        base_params = [p for p in model.parameters() if id(
+            p) not in special_params and p.requires_grad]
+        embed_parameters = [p for p in model.parameters() if id(
+            p) in special_params and p.requires_grad]
         adam = optim.Adam([
             {'params': base_params},
             {'params': embed_parameters, 'weight_decay': embed_l2},
-            ], lr=lr)
+        ], lr=lr)
 
         fit_model(model, loss_op, adam, train_gen, val_gen, nb_epochs,
                   checkpoint_path, patience)
@@ -521,7 +536,8 @@ def fit_model(model, loss_op, optim_op, train_gen, val_gen, epochs,
     torch.save(model.state_dict(), checkpoint_path)
 
     model.eval()
-    best_loss = np.mean([calc_loss(loss_op, model(Variable(xv)), Variable(yv)).data.cpu().numpy()[0] for xv, yv in val_gen])
+    best_loss = np.mean([calc_loss(loss_op, model(Variable(xv)), Variable(
+        yv)).data.cpu().numpy()[0] for xv, yv in val_gen])
     print("original val loss", best_loss)
 
     epoch_without_impr = 0
@@ -539,13 +555,15 @@ def fit_model(model, loss_op, optim_op, train_gen, val_gen, epochs,
             optim_op.step()
 
             acc = evaluate_using_acc(model, [(X_train.data, y_train.data)])
-            print("== Epoch", epoch, "step", i, "train loss", loss.data.cpu().numpy()[0], "train acc", acc)
+            print("== Epoch", epoch, "step", i, "train loss",
+                  loss.data.cpu().numpy()[0], "train acc", acc)
 
         model.eval()
         acc = evaluate_using_acc(model, val_gen)
         print("val acc", acc)
 
-        val_loss = np.mean([calc_loss(loss_op, model(Variable(xv)), Variable(yv)).data.cpu().numpy()[0] for xv, yv in val_gen])
+        val_loss = np.mean([calc_loss(loss_op, model(Variable(xv)), Variable(
+            yv)).data.cpu().numpy()[0] for xv, yv in val_gen])
         print("val loss", val_loss)
         if best_loss is not None and val_loss >= best_loss:
             epoch_without_impr += 1
@@ -560,6 +578,7 @@ def fit_model(model, loss_op, optim_op, train_gen, val_gen, epochs,
         # Early stopping
         if epoch_without_impr >= patience:
             break
+
 
 def get_data_loader(X_in, y_in, batch_size, extended_batch_sampler=True, epoch_size=25000, upsample=False, seed=42):
     """ Returns a dataloader that enables larger epochs on small datasets and
@@ -579,11 +598,14 @@ def get_data_loader(X_in, y_in, batch_size, extended_batch_sampler=True, epoch_s
     dataset = DeepMojiDataset(X_in, y_in)
 
     if extended_batch_sampler:
-        batch_sampler = DeepMojiBatchSampler(y_in, batch_size, epoch_size=epoch_size, upsample=upsample, seed=seed)
+        batch_sampler = DeepMojiBatchSampler(
+            y_in, batch_size, epoch_size=epoch_size, upsample=upsample, seed=seed)
     else:
-        batch_sampler = BatchSampler(SequentialSampler(y_in), batch_size, drop_last=False)
+        batch_sampler = BatchSampler(
+            SequentialSampler(y_in), batch_size, drop_last=False)
 
     return DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0)
+
 
 class DeepMojiDataset(Dataset):
     """ A simple Dataset class.
@@ -591,10 +613,11 @@ class DeepMojiDataset(Dataset):
     # Arguments:
         X_in: Inputs of the given dataset.
         y_in: Outputs of the given dataset.
-    
+
     # __getitem__ output:
         (torch.LongTensor, torch.LongTensor)
     """
+
     def __init__(self, X_in, y_in):
         # Check if we have Torch.LongTensor inputs (assume Numpy array otherwise)
         if not isinstance(X_in, torch.LongTensor):
@@ -610,6 +633,7 @@ class DeepMojiDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X_in[idx].squeeze(), self.y_in[idx].squeeze()
+
 
 class DeepMojiBatchSampler(object):
     """A Batch sampler that enables larger epochs on small datasets and
@@ -659,8 +683,8 @@ class DeepMojiBatchSampler(object):
             self.sample_ind = concat_ind[p]
 
             label_dist = np.mean(y_in.numpy()[self.sample_ind])
-            assert(label_dist > 0.45)
-            assert(label_dist < 0.55)
+            assert (label_dist > 0.45)
+            assert (label_dist < 0.55)
 
     def __iter__(self):
         # Hand-off data using batch_size

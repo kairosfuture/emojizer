@@ -2,13 +2,13 @@
 """ Define the Attention Layer of the model.
 """
 
-from __future__ import print_function, division
+from __future__ import division, print_function
 
 import torch
-
 from torch.autograd import Variable
 from torch.nn import Module
 from torch.nn.parameter import Parameter
+
 
 class Attention(Module):
     """
@@ -29,7 +29,8 @@ class Attention(Module):
         self.return_attention = return_attention
         self.attention_size = attention_size
         self.attention_vector = Parameter(torch.FloatTensor(attention_size))
-        self.attention_vector.data.normal_(std=0.05) # Initialize attention vector
+        self.attention_vector.data.normal_(
+            std=0.05)  # Initialize attention vector
 
     def __repr__(self):
         s = '{name}({attention_size}, return attention={return_attention})'
@@ -51,7 +52,8 @@ class Attention(Module):
         # Compute a mask for the attention on the padded sequences
         # See e.g. https://discuss.pytorch.org/t/self-attention-on-words-and-masking/5671/5
         max_len = unnorm_ai.size(1)
-        idxes = torch.arange(0, max_len, out=torch.LongTensor(max_len)).unsqueeze(0)
+        idxes = torch.arange(
+            0, max_len, out=torch.LongTensor(max_len)).unsqueeze(0)
         mask = Variable((idxes < input_lengths.unsqueeze(1)).float())
 
         # apply mask and renormalize attention scores (weights)
@@ -60,7 +62,8 @@ class Attention(Module):
         attentions = masked_weights.div(att_sums)
 
         # apply attention weights
-        weighted = torch.mul(inputs, attentions.unsqueeze(-1).expand_as(inputs))
+        weighted = torch.mul(
+            inputs, attentions.unsqueeze(-1).expand_as(inputs))
 
         # get the final fixed vector representations of the sentences
         representations = weighted.sum(dim=1)

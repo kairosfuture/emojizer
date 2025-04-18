@@ -4,14 +4,15 @@
     https://github.com/pytorch/pytorch/blob/master/torch/nn/_functions/rnn.py
 """
 
-from __future__ import print_function, division
-import math
-import torch
+from __future__ import division, print_function
 
+import math
+
+import torch
+import torch.nn.functional as F
 from torch.nn import Module
 from torch.nn.parameter import Parameter
 from torch.nn.utils.rnn import PackedSequence
-import torch.nn.functional as F
 
 
 class LSTMHardSigmoid(Module):
@@ -302,7 +303,7 @@ def StackedRNN(inners, num_layers, lstm=False, dropout=0, train=True):
     total_layers = num_layers * num_directions
 
     def forward(input, hidden, weight):
-        assert(len(weight) == total_layers)
+        assert (len(weight) == total_layers)
         next_hidden = []
 
         if lstm:

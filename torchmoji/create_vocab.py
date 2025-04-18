@@ -1,25 +1,28 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function, division
+from __future__ import division, print_function
 
 import glob
 import json
 import uuid
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
-from collections import defaultdict, OrderedDict
+
 import numpy as np
 
 from torchmoji.filter_utils import is_special_token
-from torchmoji.word_generator import WordGenerator
 from torchmoji.global_variables import SPECIAL_TOKENS, VOCAB_PATH
+from torchmoji.word_generator import WordGenerator
+
 
 class VocabBuilder():
     """ Create vocabulary with words extracted from sentences as fed from a
         word generator.
     """
+
     def __init__(self, word_gen):
         # initialize any new key with value of 0
         self.word_counts = defaultdict(lambda: 0, {})
-        self.word_length_limit=30
+        self.word_length_limit = 30
 
         for token in SPECIAL_TOKENS:
             assert len(token) < self.word_length_limit
@@ -46,7 +49,8 @@ class VocabBuilder():
             path: Where the vocabulary should be saved. If not specified, a
                   randomly generated filename is used instead.
         """
-        dtype = ([('word','|S{}'.format(self.word_length_limit)),('count','int')])
+        dtype = (
+            [('word', '|S{}'.format(self.word_length_limit)), ('count', 'int')])
         np_dict = np.array(self.word_counts.items(), dtype=dtype)
 
         # sort from highest to lowest frequency
@@ -74,9 +78,11 @@ class VocabBuilder():
         for words, _ in self.word_gen:
             self.count_words_in_sentence(words)
 
+
 class MasterVocab():
     """ Combines vocabularies.
     """
+
     def __init__(self):
 
         # initialize custom tokens
@@ -115,7 +121,8 @@ class MasterVocab():
 
             sizes[path] = sum(dicts[path].values())
             print('Overall word count for {} -> {}'.format(path, sizes[path]))
-            print('Overall word number for {} -> {}'.format(path, len(dicts[path])))
+            print(
+                'Overall word number for {} -> {}'.format(path, len(dicts[path])))
 
         vocab_of_max_size = max(sizes, key=sizes.get)
         max_size = sizes[vocab_of_max_size]
@@ -123,7 +130,8 @@ class MasterVocab():
 
         # can force one vocabulary to always be present
         if force_appearance is not None:
-            force_appearance_path = [p for p in paths if force_appearance in p][0]
+            force_appearance_path = [
+                p for p in paths if force_appearance in p][0]
             force_appearance_vocab = deepcopy(dicts[force_appearance_path])
             print(force_appearance_path)
         else:
@@ -146,8 +154,8 @@ class MasterVocab():
                         force_word_count = force_appearance_vocab[word]
                     except KeyError:
                         continue
-                    #if force_word_count < 5:
-                        #continue
+                    # if force_word_count < 5:
+                        # continue
 
                 if word in self.master_vocab:
                     self.master_vocab[word] += normalized_count
@@ -176,7 +184,7 @@ class MasterVocab():
         # use encoding of up to 30 characters (no token conversions)
         # use float to store large numbers (we don't care about precision loss)
         np_vocab = np.array(words.items(),
-                            dtype=([('word','|S30'),('count','float')]))
+                            dtype=([('word', '|S30'), ('count', 'float')]))
 
         # output count for debugging
         counts = np_vocab[:word_limit]
@@ -185,7 +193,7 @@ class MasterVocab():
         # output the index of each word for easy lookup
         final_words = OrderedDict()
         for i, w in enumerate(words.keys()[:word_limit]):
-            final_words.update({w:i})
+            final_words.update({w: i})
         with open(path_vocab, 'w') as f:
             f.write(json.dumps(final_words, indent=4, separators=(',', ': ')))
 
@@ -233,7 +241,8 @@ def extend_vocab_in_file(vocab, max_tokens=10000, vocab_path=VOCAB_PATH):
 
     # Save back to file
     with open(vocab_path, 'w') as f:
-        json.dump(current_vocab, f, sort_keys=True, indent=4, separators=(',',': '))
+        json.dump(current_vocab, f, sort_keys=True,
+                  indent=4, separators=(',', ': '))
 
 
 def extend_vocab(current_vocab, new_vocab, max_tokens=10000):
@@ -256,7 +265,7 @@ def extend_vocab(current_vocab, new_vocab, max_tokens=10000):
 
     # sort words by frequency
     desc_order = OrderedDict(sorted(new_vocab.word_counts.items(),
-                                key=lambda kv: kv[1], reverse=True))
+                                    key=lambda kv: kv[1], reverse=True))
     words.update(desc_order)
 
     base_index = len(current_vocab.keys())
