@@ -34,7 +34,7 @@ TITLES = [
     r'Mrs\.',
     r'Dr\.',
     r'Prof\.',
-    ]
+]
 # Ensure case insensitivity
 RE_TITLES = r'|'.join([r'(?i)' + t for t in TITLES])
 
@@ -65,14 +65,14 @@ EMOTICONS_START = [
     r':',
     r'=',
     r';',
-    ]
+]
 EMOTICONS_MID = [
     r'-',
     r',',
     r'^',
     '\'',
     '\"',
-    ]
+]
 EMOTICONS_END = [
     r'D',
     r'd',
@@ -87,7 +87,7 @@ EMOTICONS_END = [
     r'/',
     r'|',
     '\\',
-    ]
+]
 EMOTICONS_EXTRA = [
     r'-_-',
     r'x_x',
@@ -98,13 +98,14 @@ EMOTICONS_EXTRA = [
     r'):',
     r');',
     r'(;',
-    ]
+]
 
 RE_EMOTICON = r'|'.join([re.escape(s) for s in EMOTICONS_EXTRA])
 for s in EMOTICONS_START:
     for m in EMOTICONS_MID:
         for e in EMOTICONS_END:
-            RE_EMOTICON += '|{0}{1}?{2}+'.format(re.escape(s), re.escape(m), re.escape(e))
+            RE_EMOTICON += '|{0}{1}?{2}+'.format(
+                re.escape(s), re.escape(m), re.escape(e))
 
 # requires ucs4 in python2.7 or python3+
 # RE_EMOJI = r"""[\U0001F300-\U0001F64F\U0001F680-\U0001F6FF\u2600-\u26FF\u2700-\u27BF]"""
@@ -127,17 +128,17 @@ TOKENS = [
     RE_WORD,
     RE_SYMBOL,
     RE_EMOJI,
-    RE_ANY
-    ]
+    RE_ANY,
+]
 
 # List of ignored token patterns
 IGNORED = [
-    RE_WHITESPACE
-    ]
+    RE_WHITESPACE,
+]
 
 # Final pattern
-RE_PATTERN = re.compile(r'|'.join(IGNORED) + r'|(' + r'|'.join(TOKENS) + r')',
-                        re.UNICODE)
+RE_PATTERN = re.compile(r'|'.join(IGNORED) +
+                        r'|(' + r'|'.join(TOKENS) + r')', flags=re.UNICODE)
 
 
 def tokenize(text):
